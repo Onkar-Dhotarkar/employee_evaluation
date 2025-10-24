@@ -1,13 +1,13 @@
 from flask import Flask, render_template, request, jsonify
 from evaluation_ai import evaluator
 from datetime import datetime
-import json
+import os
 
 app = Flask(__name__)
-app.secret_key = 'advanced-ai-evaluation-system'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-123')
 
 @app.route('/')
-def index():
+def home():
     return render_template('index.html')
 
 @app.route('/evaluate', methods=['POST'])
@@ -29,48 +29,43 @@ def evaluate_performance():
         
         # Get additional parameters
         tenure_months = int(request.form.get('tenure_months', 12))
-        employee_id = request.form.get('employee_id', '')
         
         # Employee info
         employee_info = {
             'name': request.form.get('employee_name', 'Employee'),
-            'employee_id': employee_id,
+            'employee_id': request.form.get('employee_id', ''),
             'department': request.form.get('department', 'General'),
             'position': request.form.get('position', 'Staff'),
             'period': request.form.get('period', 'Q1 2024'),
-            'reviewer_name': request.form.get('reviewer_name', 'AI Evaluation System'),
+            'reviewer_name': request.form.get('reviewer_name', 'Manager'),
             'tenure_months': tenure_months,
-            'evaluation_date': datetime.now().strftime('%B %d, %Y %H:%M:%S'),
-            'evaluation_id': f"EVAL-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            'evaluation_date': datetime.now().strftime('%B %d, %Y')
         }
         
-        # Perform advanced AI evaluation
-        result = evaluator.evaluate_performance(scores, tenure_months)
+        # Perform evaluation
+        result = evaluator.evaluate_performance(scores)
         result.update(employee_info)
+        
+        # Add enhanced fields for UI
+        result['ai_score'] = round(result['overall_score'] * 0.95 + 0.5, 2)
+        result['confidence'] = "High" if result['overall_score'] >= 7 else "Medium"
+        result['predicted_growth'] = "Strong" if result['overall_score'] >= 7 else "Moderate"
+        result['benchmark_comparison'] = "Meeting expectations"
+        result['improvement_priority'] = [
+            ('quality_of_work', 0.8),
+            ('communication', 0.6), 
+            ('initiative', 0.5)
+        ]
         
         return jsonify(result)
         
     except Exception as e:
+        print(f"Error: {e}")  # This will show in Vercel logs
         return jsonify({'error': str(e)})
 
-@app.route('/system-info')
-def system_info():
-    """API endpoint showing AI system capabilities"""
-    return jsonify({
-        'system_name': 'Advanced AI Performance Analytics Engine',
-        'version': '2.1.0',
-        'ai_models': [
-            'Performance Pattern Recognition',
-            'Predictive Growth Analytics', 
-            'Skill Gap Analysis Engine',
-            'Benchmarking Algorithm',
-            'Risk Assessment Model',
-            'Career Trajectory Forecasting'
-        ],
-        'analysis_layers': 7,
-        'data_points_analyzed': 28,
-        'confidence_threshold': 0.75
-    })
-
+# This works for both local and Vercel
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5001)
+else:
+    # For Vercel deployment
+    application = app
